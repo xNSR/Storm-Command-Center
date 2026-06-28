@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Storm Command Center</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="live-dot" aria-hidden="true"></span>
+        <div>
+          <h1>Storm Command Center</h1>
+          <p>NOAA, NWS, SPC, NCEP live desk</p>
+        </div>
+      </div>
+      <div class="status-strip" aria-live="polite">
+        <span class="status-pill" id="radarStatus">Radar: booting</span>
+        <span class="status-pill" id="alertStatus">Alerts: booting</span>
+        <span class="status-pill" id="forecastStatus">Forecast: idle</span>
+      </div>
+      <div class="top-actions">
+        <button class="icon-button" id="findMeBtn" title="Use my location" aria-label="Use my location">
+          <i data-lucide="crosshair"></i>
+        </button>
+        <button class="icon-button" id="notifyBtn" title="Desktop alerts" aria-label="Desktop alerts">
+          <i data-lucide="bell"></i>
+        </button>
+        <button class="icon-button" id="soundBtn" title="Alert tone" aria-label="Alert tone" aria-pressed="false">
+          <i data-lucide="volume-2"></i>
+        </button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="side-panel left-panel" aria-label="Analysis controls">
+        <section class="panel-block">
+          <div class="block-heading">
+            <h2>Radar</h2>
+            <button class="small-icon-button" id="refreshRadarBtn" title="Refresh radar frames" aria-label="Refresh radar frames">
+              <i data-lucide="refresh-cw"></i>
+            </button>
+          </div>
+          <label class="field">
+            <span>Product</span>
+            <select id="radarProduct">
+              <option value="conus_bref_qcd">MRMS base reflectivity</option>
+              <option value="conus_cref_qcd">MRMS composite reflectivity</option>
+              <option value="conus_neet_v18">MRMS echo tops</option>
+              <option value="conus_pcpn_typ">MRMS precipitation type</option>
+              <option value="single_site">Single-site WSR-88D</option>
+            </select>
+          </label>
+
+          <div id="singleSiteControls" class="sub-controls" hidden>
+            <label class="field">
+              <span>Radar site</span>
+              <input id="siteSearch" type="search" placeholder="KTLX, Dallas, OUN">
+            </label>
+            <label class="field">
+              <span>Site layer</span>
+              <select id="siteProduct">
+                <option value="sr_bref">Base reflectivity</option>
+                <option value="sr_bvel">Base velocity</option>
+                <option value="bdhc">Hydrometeor class</option>
+                <option value="boha">One-hour rainfall</option>
+                <option value="bdsa">Storm-total rainfall</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Selected site</span>
+              <select id="radarSite"></select>
+            </label>
+          </div>
+
+          <label class="field range-field">
+            <span>Opacity</span>
+            <input id="radarOpacity" type="range" min="15" max="100" value="82">
+          </label>
+          <div class="radar-player">
+            <button class="icon-button compact" id="radarPrevBtn" title="Previous frame" aria-label="Previous frame">
+              <i data-lucide="skip-back"></i>
+            </button>
+            <button class="icon-button compact" id="radarPlayBtn" title="Play radar loop" aria-label="Play radar loop">
+              <i data-lucide="play"></i>
+            </button>
+            <button class="icon-button compact" id="radarNextBtn" title="Next frame" aria-label="Next frame">
+              <i data-lucide="skip-forward"></i>
+            </button>
+            <input id="radarFrame" type="range" min="0" max="0" value="0" aria-label="Radar frame">
+          </div>
+          <div class="frame-label" id="radarFrameLabel">Latest frame</div>
+          <img class="legend" id="radarLegend" alt="Radar legend">
+        </section>
+
+        <section class="panel-block">
+          <div class="block-heading">
+            <h2>Overlays</h2>
+            <button class="small-icon-button" id="refreshOutlooksBtn" title="Refresh outlooks" aria-label="Refresh outlooks">
+              <i data-lucide="cloud-sun"></i>
+            </button>
+          </div>
+          <div class="toggle-list">
+            <label><input type="checkbox" id="warningsToggle" checked> NWS warning polygons</label>
+            <label><input type="checkbox" id="radarSitesToggle"> Radar sites</label>
+            <label><input type="checkbox" data-outlook="day1cat" checked> SPC Day 1 categorical</label>
+            <label><input type="checkbox" data-outlook="day2cat"> SPC Day 2 categorical</label>
+            <label><input type="checkbox" data-outlook="day3cat"> SPC Day 3 categorical</label>
+            <label><input type="checkbox" data-outlook="day1torn"> Day 1 tornado</label>
+            <label><input type="checkbox" data-outlook="day1wind"> Day 1 wind</label>
+            <label><input type="checkbox" data-outlook="day1hail"> Day 1 hail</label>
+          </div>
+        </section>
+
+        <section class="panel-block">
+          <div class="block-heading">
+            <h2>Point</h2>
+            <button class="small-icon-button" id="clearPointBtn" title="Clear point" aria-label="Clear point">
+              <i data-lucide="x"></i>
+            </button>
+          </div>
+          <div class="coord-grid">
+            <label class="field">
+              <span>Latitude</span>
+              <input id="latInput" inputmode="decimal" placeholder="35.4676">
+            </label>
+            <label class="field">
+              <span>Longitude</span>
+              <input id="lonInput" inputmode="decimal" placeholder="-97.5164">
+            </label>
+          </div>
+          <button class="action-button" id="loadPointBtn">
+            <i data-lucide="map-pin"></i>
+            Load forecast
+          </button>
+          <div class="point-readout" id="pointReadout">No forecast point selected</div>
+        </section>
+      </aside>
+
+      <section class="map-shell" aria-label="Weather map">
+        <div id="map"></div>
+        <div class="map-actions" aria-label="Map controls">
+          <button class="icon-button" id="baseLayerBtn" title="Change base map" aria-label="Change base map">
+            <i data-lucide="layers"></i>
+          </button>
+          <button class="icon-button is-active" id="radarToggleBtn" title="Radar layer" aria-label="Radar layer" aria-pressed="true">
+            <i data-lucide="radio-tower"></i>
+          </button>
+          <button class="icon-button is-active" id="alertLayerBtn" title="Alert polygons" aria-label="Alert polygons" aria-pressed="true">
+            <i data-lucide="triangle-alert"></i>
+          </button>
+          <button class="icon-button" id="fitConusBtn" title="Fit CONUS" aria-label="Fit CONUS">
+            <i data-lucide="maximize"></i>
+          </button>
+        </div>
+        <div class="map-readout" id="mapReadout">Lat 0.0000, Lon 0.0000</div>
+      </section>
+
+      <aside class="side-panel right-panel" aria-label="Reports and guidance">
+        <nav class="tabs" aria-label="Panel tabs">
+          <button class="tab-button is-active" data-tab="alerts">Alerts</button>
+          <button class="tab-button" data-tab="forecast">Forecast</button>
+          <button class="tab-button" data-tab="guidance">Guidance</button>
+        </nav>
+
+        <section class="tab-panel is-active" id="alertsPanel">
+          <div class="panel-tools">
+            <label class="field">
+              <span>Filter</span>
+              <select id="alertFilter">
+                <option value="all">All active</option>
+                <option value="warnings">Warnings</option>
+                <option value="severe">High impact</option>
+                <option value="point">Focus point</option>
+              </select>
+            </label>
+            <label class="inline-toggle"><input type="checkbox" id="boundsFilter"> Map bounds</label>
+          </div>
+          <div class="alert-summary" id="alertSummary">Awaiting NWS alert feed</div>
+          <div class="alert-list" id="alertList"></div>
+        </section>
+
+        <section class="tab-panel" id="forecastPanel">
+          <div class="forecast-current" id="currentConditions">
+            <span class="muted">Select a point for NWS forecast and observations.</span>
+          </div>
+          <canvas id="hourlyChart" height="150"></canvas>
+          <div class="forecast-list" id="forecastList"></div>
+        </section>
+
+        <section class="tab-panel" id="guidancePanel">
+          <div class="guidance-switcher" id="guidanceButtons">
+            <button class="guidance-button is-active" data-guidance="day1">Day 1</button>
+            <button class="guidance-button" data-guidance="day2">Day 2</button>
+            <button class="guidance-button" data-guidance="day3">Day 3</button>
+          </div>
+          <a id="guidanceLink" href="https://www.spc.noaa.gov/products/outlook/day1otlk.html" target="_blank" rel="noreferrer">
+            <img class="guidance-image" id="guidanceImage" alt="SPC outlook">
+          </a>
+          <div class="model-grid">
+            <a href="https://mag.ncep.noaa.gov/" target="_blank" rel="noreferrer">NCEP MAG</a>
+            <a href="https://nomads.ncep.noaa.gov/" target="_blank" rel="noreferrer">NOMADS</a>
+            <a href="https://www.wpc.ncep.noaa.gov/" target="_blank" rel="noreferrer">WPC</a>
+            <a href="https://www.nhc.noaa.gov/" target="_blank" rel="noreferrer">NHC</a>
+            <a href="https://www.spc.noaa.gov/products/md/" target="_blank" rel="noreferrer">SPC MDs</a>
+            <a href="https://www.spc.noaa.gov/products/watch/" target="_blank" rel="noreferrer">SPC Watches</a>
+            <a href="https://www.spc.noaa.gov/climo/reports/today.html" target="_blank" rel="noreferrer">Storm Reports</a>
+            <a href="https://www.weather.gov/" target="_blank" rel="noreferrer">weather.gov</a>
+          </div>
+          <div class="nhc-box" id="nhcBox">NHC storms loading</div>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <div class="toast-region" id="toastRegion" aria-live="assertive"></div>
+
+  <dialog id="alertDialog" class="alert-dialog">
+    <div class="dialog-header">
+      <h2 id="dialogTitle">Alert details</h2>
+      <button class="small-icon-button" id="closeDialogBtn" title="Close" aria-label="Close">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+    <div id="dialogBody"></div>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
